@@ -1,0 +1,357 @@
+# -*- coding: utf-8 -*-
+v000= "0.0.3"
+readme = str("""
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    Created on Thu Feb  7 15:23:40 2019
+    
+    @author: bhopp
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    
+    Weld Plan Compiler Code Package v0.0.3               AS OF: 08FEB2019
+    ------------------------------------
+    ------------------------------------
+    
+    Illinois Blower, INC
+    750 Industrial Dr # E
+    Cary, IL 60013
+    
+    Created by: bhopp
+    bhopp@illinoisblower.com
+    
+    --------------------------------------------------------------------------------------------------------------------------
+    --------------------------------------------------------------------------------------------------------------------------
+    
+    INDEX of README
+    ---------------
+    0-a.-INDEX of README
+     -b.-INDEX of FOLDER
+    1-   TERMINOLOGY
+    2-   PROCESS and PLANNING
+    
+    
+    INDEX of FOLDER
+    ------------------
+    0-Example Weld Plans
+    1-Scripts
+    2-Templates
+    3-Weld Information
+    
+    --------------------------------------------------------------------------------------------------------------------------
+    --------------------------------------------------------------------------------------------------------------------------
+    
+    1-TERMINOLOGY
+    -------------
+    IBI: Illinois Blower, INC
+    
+    Weld Descriptions: the IBI part number description- denoted by a "050-0XXX" number, containing weld type and callouts to weld procedures.
+    
+    WPS: Weld Procedure Specification- Procdeure for doing a weld, due to type and materials.
+    
+    PQR: Procedure Qualification Record- Certification of WPS by qualified inspector.
+    
+    NDE: Non Destructive Examination- Post-weld inspection reports due to type of inspection needed as requested by customer.
+    
+    PMI: Positive Material Inspection- Inspection reports of supplier material upon reception.
+    
+    P#: Type of material grouping for material types (i.e. P1 is Carbon Steel, P8 Stainless..)
+    
+    Weld Label:   ID stamped near weld callouts on drawing files- usually denoted by a flag with two letters paired inside (i.e. "AA" "BB"). 
+       /Callout   ID's should be consistent throughout whole plan. Welds with the same weld type, or description, on different materials will get different labels.
+    
+    WIR: Weld Inspection Record- Report that contains all weld callouts/Labels/ID's with respective part numbers, WPS and PQR overviews, NDE callouts, and PMI information.
+    
+    "-W': Weldment Drawing- CAD PDF drawing with omitted dimensions to emphasize weld callouts.
+    
+    Weld Plan: The "pre-weld" quality plan submitted for approval, revised -if needed, and followed.
+    	Should include:
+    	Cover sheets
+    	Index
+    	Weld Descriptions of welds used
+    	WIR's (WIR)
+    	   Insepctions needed
+    	   Weldment Drawings	
+    	WPS's
+    	   PQR's
+    	[Misc. Weld Documents TBD]
+    	
+    --------------------------------------------------------------------------------------------------------------------------
+    --------------------------------------------------------------------------------------------------------------------------
+    
+    2-PROCESS and PLANNING
+    ----------------------
+    Currently:
+    	Fixes openpyxl from merged cell border style issue
+    	Basic GUI for data input
+    	Creates an Excel WIR file for each part
+    	Lists all welds in WIR for each part
+    	Create new folder file paths per Sales Order
+    	Creates coversheets/index with customer info
+    
+    In process:
+    	List all parts with repective weld information on coversheet
+    		-needs to append data from weld loop, to cover sheet
+    	Cataloging all required data for "API" callout
+      Choosing template destination/directory (whether it's manual or with package installer)    
+    	Choose save destination (has static file path, with input based path creation, but ideal to have GUI for save destination)
+    Needs:
+    	Either:
+    		-Rolling code callouts for weld labels (assign weld type, due to materials, a label and standardize that across the assembly)- ID's would be different across different jobs, but consistent within job
+    		or
+    		-Standardize all weld desciptions due to each material with weld labels- would take a while to catalog a database for information
+    
+    	Solidworks API streamlining- be able to have assemblies package every weld listed and properly label weld and automatically pull part info
+    		(Would need weld symbol knowledge and disipline with designers, and learning a Python Solidworks workthrough)
+    		Ideal to also have dimensions on layer so a macro could hide dimension layer to leave weld callouts on drawing for "-W" drawings.
+    		(would need designer disipline and could possible eliminate this step)    
+    	See previous weld packages for editing
+    	
+    	File search and copier to find, due to weld type and material, respective "-W", WPS, PQR, and NDE PDF's"""
+
+)
+
+#------------------------------------------------------------------------------
+
+#Start Code
+import easygui
+from easygui import multenterbox, ccbox, fileopenbox, diropenbox, msgbox
+
+import openpyxl
+from openpyxl import load_workbook
+from fix_border import patch_worksheet
+from openpyxl.workbook import Workbook
+from openpyxl.cell import Cell
+from openpyxl.utils import coordinate_from_string
+from openpyxl.comments import Comment
+
+
+#------------------------------------------------------------------------------
+
+#Customer and Project Info GUI
+"""
+msg = "Customer and Project Info"
+title = "WELD PLAN COMPILER"
+fieldNames = ["Customer Name: ","SO#: ","JO#: ","Top-Level Drawing#: ","Fan Type","Fan Description: ","Tag#: ","Revision"]
+fieldValues = []  # we start with blanks for the values
+fieldValues = multenterbox(msg,title, fieldNames)
+CN,S,J,TP,FT,D,tn,Rev = fieldValues
+# make sure that none of the fields was left blank
+while 1:
+    if fieldValues == None: break
+    errmsg = ""
+    for i in range(len(fieldNames)):
+      if fieldValues[i].strip() == "":
+        errmsg = errmsg + ('"%s" is a required field.\n\n' % fieldNames[i])
+    if errmsg == "": break # no problems found
+    fieldValues = multenterbox(errmsg, title, fieldNames, fieldValues)
+"""
+
+#Static Project Input Info
+#"""
+CN= "The Customer"
+S = "190207"                  
+J = "001A1-0000"
+TP = "010-0001"
+FT = "Type"
+D = "Fan Description"
+tn = "X-0000"
+Rev = "-"  
+#"""
+#------------------------------------------------------------------------------
+
+#Used for importing template without losing borders on merged cells with openpyxl
+patch_worksheet()
+
+msgbox(msg='Please Select the "Weld Plan Compiler Code Package" Folder Directory', title='Weld Plan Compiler Code',ok_button='OK')
+WPCCLoc = diropenbox(msg=' Directory Location', title='Weld Plan Compiler Code', default='*')
+
+wb = load_workbook(WPCCLoc+'\\Templates\\Used Templates\\WIRTemplateA.xlsx')
+WPI = load_workbook(WPCCLoc+'\\Templates\\Used Templates\\WeldPlanIndex.xlsx')
+def get_border(self, border_style=None, color=None):
+    return Border(left=Side(border_style=border_style, color=color),
+                             right=Side(border_style=border_style, color=color),
+                             top=Side(border_style=border_style, color=color),
+                             bottom=Side(border_style=border_style, color=color), )
+
+def update_style(self, ws, cell_range):
+    start_cell, end_cell = cell_range.split(':')
+    start_coord = coordinate_from_string(start_cell)
+    end_coord = coordinate_from_string(end_cell)
+
+    start_row = start_coord[1]
+    end_row = end_coord[1]
+
+    start_col = column_index_from_string(start_coord[0])
+    end_col = column_index_from_string(end_coord[0])
+
+    border_style = ws.cell(row=start_row, column=start_col).border.left.style
+    color = ws.cell(row=start_row, column=start_col).border.left.color
+
+    cellborder = self.get_border(border_style, color)
+
+    for row in range(start_row, end_row + 1):
+        for col in range(start_col, end_col + 1):
+            ws.cell(row=row, column=col).border = cellborder
+
+def update_borders(self, wb):
+    for sheet in wb.sheetnames:
+        ws = wb[sheet]
+        for each_range in ws.merged_cell_ranges:
+            self.update_style(ws, each_range)
+#------------------------------------------------------------------------------
+            
+#Worksheet Labeling
+sheet0=wb.worksheets[0]
+WPIsht0=WPI.worksheets[0]
+WPIsht1=WPI.worksheets[1]
+WPIsht2=WPI.worksheets[2]
+
+
+#List Variables
+weld_list = []
+p1_list = []
+p2_list = []
+part_list = []
+part_desc = []
+part_weld = []
+master_weld = []
+
+#Folder File Path Creator
+import os
+if not os.path.exists(WPCCLoc+'\\Weld Test Folder\\'+S+'\\'+FT):
+    os.makedirs(WPCCLoc+'\\Weld Test Folder\\'+S+'\\'+FT) 
+    
+#------------------------------------------------------------------------------
+    
+#Template Header Customer and Project Information
+WPIsht0['D3'] = TP + " " + D + "-WIR"
+WPIsht0['A7'] = CN
+WPIsht0['A8'] = "PO#: " +S
+WPIsht0['A9'] = FT + " " + D
+WPIsht0['A10'] = "TAG#: "+ tn + " JO#: " + J
+WPIsht0['C3'] = Rev
+WPIsht0['B14'] = D
+
+WPIsht1['E3'] = TP + " " + D + "-WIR"
+WPIsht1['A7'] = CN
+WPIsht1['A8'] = "PO#: " +S
+WPIsht1['A9'] = FT + " " + D
+WPIsht1['A10'] = "TAG#: "+ tn + " JO#: " + J
+WPIsht1['A11'] = "Drawing#: " + TP
+WPIsht1['D3'] = Rev
+
+WPIsht2['D3'] = TP + " " + D + "-WIR"
+WPIsht2['A7'] = CN
+WPIsht2['A8'] = "PO#: " +S
+WPIsht2['A9'] = D
+WPIsht2['A10'] = "TAG#: "+ tn + " JO#: " + J
+WPIsht2['A11'] = "Drawing#: " + TP
+WPIsht2['C3'] = Rev
+
+    
+
+sheet0['A7'] = CN
+sheet0['A8'] = "PO#: " +S
+sheet0['A9'] = FT + D
+sheet0['A10'] = "TAG#: "+ tn + " JO#: " + J
+sheet0['A11'] = "Drawing#: " + TP
+
+sheet0['C3'] = Rev
+
+#------------------------------------------------------------------------------
+
+#Loop for Continuous Part and Weld Description Input Data
+m = 1
+for i in range(0,m):
+    while 1:
+        msg = "Part Info"
+        title = "WELD PLAN COMPILER"
+        fieldNames = ["Part#: ","Part Description: "]
+        fieldValues = []
+        fieldValues = multenterbox(msg,title, fieldNames)
+        P, PD = fieldValues
+        PWir = [P + "-WIR"]
+        PDlist = [PD]
+        part_list.append(PWir)
+        part_desc.append(PDlist)
+        part_list, part_desc = (list(i) for i in zip(*sorted(zip(part_list,part_desc))))
+        sheet0['A3'] = P + "-WIR"
+        sheet0['B15'] = P + "-W"
+        sheet0['D15'] = PD
+        # Makes sure that none of the fields was left blank
+        #Possible deletion of this
+        while 1:
+            if fieldValues == None: break
+            errmsg = ""
+            for i in range(len(fieldNames)):
+              if fieldValues[i].strip() == "":
+                errmsg = errmsg + ('"%s" is a required field.\n\n' % fieldNames[i])
+            if errmsg == "": break 
+            fieldValues = multenterbox(errmsg, title, fieldNames, fieldValues)
+        n = 1
+        for i in range(0, n): 
+            while 1:
+                msg = "Weld Description Info"
+                title = "WELD PLAN COMPILER"
+                fieldNames = ['Weld Description#: ','1st P#: ','2nd P#: ']
+                fieldValues = []
+                fieldValues = multenterbox(msg,title, fieldNames)
+                w, p1, p2 = fieldValues
+                weld_list.append(w)
+                p1_list.append(p1)
+                p2_list.append(p2)
+                part_weld.append(w)
+                master_weld.append(w)
+                part_list, master_weld = (list(i) for i in zip(*sorted(zip(part_list,master_weld))))
+                
+                if ccbox(msg='Add New Weld?', title=' ', choices=('[A]dd Weld', 'Ne[x]t')):
+                    pass
+                    n = n + 1                     
+                else:
+                    weld_list, p1_list, p2_list = (list(i) for i in zip(*sorted(zip(weld_list,p1_list,p2_list))))
+                    r = 20
+                    for weldN in weld_list:
+                        sheet0.cell(row=r, column=3).value = weldN
+                        r += 1
+                    wb.save(WPCCLoc+'\\Weld Test Folder\\'+S+'\\'+FT+'\\'+P+'-WIR.xlsx')
+                    break
+                    
+        if ccbox(msg='Add New Part?', title=' ', choices=('[A]dd Part', '[D]one')):
+            pass
+            m = m + 1            
+        else:    
+            break
+                        
+#------------------------------------------------------------------------------
+
+#In-process: Listing Rolling Append Data on Coversheet Index 
+#Not Working                  
+
+#print(part_list) #For testing
+#print(part_desc)
+#print(master_weld)
+"""
+r = 13
+for index in part_desc:
+    WPIsht1.cell(row=r, column=2).value = index
+    r += 1
+
+r = 13
+for index in part_list:
+    WPIsht1.cell(row=r, column=3).value = index
+    r += 1
+r = 13
+for index in master_weld:
+    WPIsht1.cell(row=r, column=4).value = index
+    r += 1
+"""
+
+#Saves Coversheets
+WPI.save(WPCCLoc+'\\Weld Test Folder\\'+S+'\\'+FT+'\\'+FT+'-Weld Plan Index Cover Sheets.xlsx')
+
+#Update README
+file.
+
+
+            
